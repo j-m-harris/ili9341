@@ -41,9 +41,7 @@
 
 #define DC 4
 #define CS 27
-#define RD 14
 #define RW 15
-#define IM0 10
 #define RESET 17
 
 #define ORIENTATION 0 //0=LANDSCAPE 1=PORTRAIT  
@@ -87,9 +85,7 @@ static void tft_init_board(struct fb_info *info)
 	
 	gpio_setoutput(DC);
 	gpio_setoutput(CS);
-	gpio_setoutput(RD);
 	gpio_setoutput(RW);
-	gpio_setoutput(IM0);
 	gpio_setoutput(RESET);
     
     gpio_setstate(DATA0,0);
@@ -103,9 +99,7 @@ static void tft_init_board(struct fb_info *info)
     
     gpio_setstate(DC,1);
     gpio_setstate(CS,0);
-    gpio_setstate(RD,1);
     gpio_setstate(RW,1);
-    gpio_setstate(IM0,1);
     gpio_setstate(RESET,1);
 
 }
