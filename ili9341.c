@@ -116,8 +116,6 @@ static void tft_init_board(struct fb_info *info)
 	gpio_setoutput(RW);
 	gpio_setoutput(RESET);
 
-	gpio_setoutput(LED);
-    
     gpio_setstate(DATA0,0);
     gpio_setstate(DATA1,0);
     gpio_setstate(DATA2,0);
