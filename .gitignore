@@ -1,0 +1,6 @@
+Module.symvers
+modules.order
+ili9341.mod*
+.ili9341*
+*.ko
+*.o
