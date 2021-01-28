@@ -186,7 +186,6 @@ static void gpio_set_parallel_data16(char data1, char data2)
     gpio_setstate(DATA10,((data1 >> 2)  & 0x01));
 
     // RED
-    // Least significant bits first.
     gpio_setstate(DATA11,((data1 >> 3)  & 0x01));
     gpio_setstate(DATA12,((data1 >> 4)  & 0x01));
     gpio_setstate(DATA13,((data1 >> 5)  & 0x01));
