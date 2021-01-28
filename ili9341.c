@@ -1,7 +1,15 @@
-/*
- * ili9342 LCD for Raspberry Pi Model B rev2
+/**
+ * A Raspberry pi framebuffer driver for the ili9341 lcd driver using 16bit parallel transfer.
+ *
+ * Copyright (C) 2021 John Harris <jmharris@gmail.com>
+ *
+ * Forked from 8bit parallel driver at https://github.com/sammyizimmy/ili9341
+ * In turn originally based on Admatec C-Berry LCD for Raspberry Pi Model B.
  */
- 
+
+// 0x20000000 on the Pi Zero, Pi Zero W, and the first generation of the Raspberry Pi
+// Differs on later pis, check docs at:
+// https://www.raspberrypi.org/documentation/hardware/raspberrypi/peripheral_addresses.md
 #define BCM2708_PERI_BASE        0x20000000
 #define GPIO_BASE                (BCM2708_PERI_BASE + 0x200000) /* GPIO controller */
 
@@ -30,19 +38,30 @@
 #define GPIO_SET *(gpio+7)  // sets   bits which are 1 ignores bits which are 0
 #define GPIO_CLR *(gpio+10) // clears bits which are 1 ignores bits which are 0
 
-#define DATA0 9
-#define DATA1 11
-#define DATA2 18
-#define DATA3 23
-#define DATA4 24
-#define DATA5 25
-#define DATA6 8
-#define DATA7 7
+// DB0-DB7 for commands and 8bit data.
+#define DATA0 26
+#define DATA1 19
+#define DATA2 13
+#define DATA3 6
+#define DATA4 5
+#define DATA5 0
+#define DATA6 11
+#define DATA7 9
+// DB8-DB15 for rest of 16bit data.
+#define DATA8 21
+#define DATA9 20
+#define DATA10 16
+#define DATA11 12
+#define DATA12 1
+#define DATA13 7
+#define DATA14 8
+#define DATA15 25
 
-#define DC 4
-#define CS 27
-#define RW 15
-#define RESET 17
+#define DC 23
+#define CS 14
+#define RD 15
+#define RW 18
+#define RESET 24
 
 #define ORIENTATION 0 //0=LANDSCAPE 1=PORTRAIT  
 
@@ -50,7 +69,6 @@
 #define DISPLAY_HEIGHT  240
 
 #define DISPLAY_BPP     16
-
 
 
 volatile unsigned *gpio;
@@ -82,11 +100,23 @@ static void tft_init_board(struct fb_info *info)
 	gpio_setoutput(DATA5);
 	gpio_setoutput(DATA6);
 	gpio_setoutput(DATA7);
+
+	gpio_setoutput(DATA8);
+	gpio_setoutput(DATA9);
+	gpio_setoutput(DATA10);
+	gpio_setoutput(DATA11);
+	gpio_setoutput(DATA12);
+	gpio_setoutput(DATA13);
+	gpio_setoutput(DATA14);
+	gpio_setoutput(DATA15);
 	
 	gpio_setoutput(DC);
 	gpio_setoutput(CS);
+	gpio_setoutput(RD);
 	gpio_setoutput(RW);
 	gpio_setoutput(RESET);
+
+	gpio_setoutput(LED);
     
     gpio_setstate(DATA0,0);
     gpio_setstate(DATA1,0);
@@ -97,11 +127,22 @@ static void tft_init_board(struct fb_info *info)
     gpio_setstate(DATA6,0);
     gpio_setstate(DATA7,0);
     
+    gpio_setstate(DATA8,0);
+    gpio_setstate(DATA9,0);
+    gpio_setstate(DATA10,0);
+    gpio_setstate(DATA11,0);
+    gpio_setstate(DATA12,0);
+    gpio_setstate(DATA13,0);
+    gpio_setstate(DATA14,0);
+    gpio_setstate(DATA15,0);
+
     gpio_setstate(DC,1);
     gpio_setstate(CS,0);
+    gpio_setstate(RD,1);
     gpio_setstate(RW,1);
     gpio_setstate(RESET,1);
 
+    printk(KERN_INFO "fb%d: ili9341 init board\n", info->node);
 }
 
 // hard reset of the graphic controller and the tft
@@ -113,6 +154,7 @@ static void tft_hard_reset(void)
     msleep(120);
 }
 
+// Set 8bit data.
 static void gpio_set_parallel_data(char data)
 {
     gpio_setstate(DATA0,((data >> 0)  & 0x01));
@@ -123,6 +165,35 @@ static void gpio_set_parallel_data(char data)
     gpio_setstate(DATA5,((data >> 5)  & 0x01));
     gpio_setstate(DATA6,((data >> 6)  & 0x01));
     gpio_setstate(DATA7,((data >> 7)  & 0x01));
+}
+
+// Set 16bit data.
+static void gpio_set_parallel_data16(char data1, char data2)
+{
+    // Expect RGB565, as two 8bit chars.
+    // Least significant bits first.
+    // BLUE
+    gpio_setstate(DATA0,((data2 >> 0)  & 0x01));
+    gpio_setstate(DATA1,((data2 >> 1)  & 0x01));
+    gpio_setstate(DATA2,((data2 >> 2)  & 0x01));
+    gpio_setstate(DATA3,((data2 >> 3)  & 0x01));
+    gpio_setstate(DATA4,((data2 >> 4)  & 0x01));
+
+    // GREEN
+    gpio_setstate(DATA5, ((data2 >> 5)  & 0x01));
+    gpio_setstate(DATA6, ((data2 >> 6)  & 0x01));
+    gpio_setstate(DATA7, ((data2 >> 7)  & 0x01));
+    gpio_setstate(DATA8, ((data1 >> 0)  & 0x01));
+    gpio_setstate(DATA9, ((data1 >> 1)  & 0x01));
+    gpio_setstate(DATA10,((data1 >> 2)  & 0x01));
+
+    // RED
+    // Least significant bits first.
+    gpio_setstate(DATA11,((data1 >> 3)  & 0x01));
+    gpio_setstate(DATA12,((data1 >> 4)  & 0x01));
+    gpio_setstate(DATA13,((data1 >> 5)  & 0x01));
+    gpio_setstate(DATA14,((data1 >> 6)  & 0x01));
+    gpio_setstate(DATA15,((data1 >> 7)  & 0x01));
 }
 
 // write command
@@ -139,6 +210,13 @@ static void tft_data_write(char data)
 {
     gpio_setstate(DC,1);
     gpio_set_parallel_data(data);
+    gpio_setstate(RW,0);
+    gpio_setstate(RW,1);
+}
+static void tft_data16_write(char data1, char data2)
+{
+    gpio_setstate(DC,1);
+    gpio_set_parallel_data16(data1, data2);
     gpio_setstate(RW,0);
     gpio_setstate(RW,1);
 }
@@ -307,18 +385,23 @@ static void ili9341_update_display(const struct fb_info *info)
 	
 	tft_command_write(0x2C); //Memory Write
 	
+	// screen_base has two 8bit values, making up 16bits per pixel (in RGB565 format).
 	if(ORIENTATION == 0){
 		for(y=0;y < DISPLAY_WIDTH ;y++){
 			for(x=0;x < DISPLAY_HEIGHT ;x++){
-				tft_data_write(info->screen_base[(x * (2 * DISPLAY_WIDTH)) + (y * 2) + 1]);
-				tft_data_write(info->screen_base[(x * (2 * DISPLAY_WIDTH)) + (y * 2) + 2]);
+				tft_data16_write(
+					info->screen_base[(x * (2 * DISPLAY_WIDTH)) + (y * 2) + 1],
+					info->screen_base[(x * (2 * DISPLAY_WIDTH)) + (y * 2) + 2]
+				);
 			}
 		}
 	}else{
 		for(y=(DISPLAY_HEIGHT - 1);y >= 0 ;y--){
 			for(x=0;x < DISPLAY_WIDTH ;x++){
-				tft_data_write(info->screen_base[(y * (2 * DISPLAY_WIDTH)) + (x * 2) + 1]);
-				tft_data_write(info->screen_base[(y * (2 * DISPLAY_WIDTH)) + (x * 2) + 2]);
+				tft_data16_write(
+					info->screen_base[(y * (2 * DISPLAY_WIDTH)) + (x * 2) + 1],
+					info->screen_base[(y * (2 * DISPLAY_WIDTH)) + (x * 2) + 2]
+				);
 			}
 		}
 	}
@@ -327,14 +410,14 @@ static void ili9341_update_display(const struct fb_info *info)
 
 static void ili9341_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
-	//printk(KERN_INFO "fb%d: ili9341_fillrect\n", info->node);
+    //printk(KERN_INFO "fb%d: ili9341_fillrect\n", info->node);
     //ili9341_update_display_color_area(rect);
     ili9341_update_display(info);
 }
 
 static void ili9341_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
-	//printk(KERN_INFO "fb%d: ili9341_copyarea\n", info->node);
+    //printk(KERN_INFO "fb%d: ili9341_copyarea\n", info->node);
     ili9341_update_display(info);
 }
 
@@ -547,7 +630,7 @@ static int ili9341_probe(struct platform_device *pdev)
     tft_hard_reset();
     tft_init(info);
 
-    printk(KERN_INFO "fb%d: ili9341 LCD framebuffer device\n", info->node);
+    printk(KERN_INFO "fb%d: ili9341 LCD framebuffer device for TFT_320QDT_9341\n", info->node);
     return 0;
 }
 
@@ -613,7 +696,7 @@ MODULE_PARM_DESC(fps, "Frames per second (default 25)");
 module_init(ili9341_init);
 module_exit(ili9341_exit);
 
-MODULE_DESCRIPTION("ili9341 LCD framebuffer driver");
-MODULE_AUTHOR("sammyizimmy");
+MODULE_DESCRIPTION("ili9341 16bit parallel LCD framebuffer driver");
+MODULE_AUTHOR("jmharris@gmail.com");
 MODULE_LICENSE("GPL");
 
