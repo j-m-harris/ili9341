@@ -23,20 +23,30 @@ the new one and write some random data to the framebuffer.
 
 ## Wiring
 
-R-PI Model B v2 GPIO
-LCD GPIO p1 p2 GPIO LCD
-      3v--* o--5v
-      02--o o--5v
-      03--o o--GND
-DC----04--o o--14---RD
-     GND--o o--15---WR
-RESET-17--o o--18---DB10
-CS----27--o o--GND
-      22--o o--23---DB11
-      3v--o o--24---DB12
-IM0---10--o o--GND
-DB8---09--o o--25---DB13
-DB9---11--o o--08---DB14
-     GND--o o--07---DB15
-        p25 p26
+PCB     | Pi pin | Pi ref  | Source ref | Comments
+--------|--------|---------|------------|---------
+LEDA    | 17     | 3.3v    |            | LED anode
+REST    | 18     | GPIO 24 | RESET      | Pull low (via resistor) to reset- could use a button.
+CS      | 8      | GPIO 14 | CS         | Always tied to ground.
+RD      | 10     | GPIO 15 | RD         |
+WR      | 12     | GPIO 18 | RW         |
+RS      | 16     | GPIO 23 | DC         | Data/Command
+VCC     | 1      | 3.3v    |            | J1 must be bridged to bypass 5v voltage regulator.
+GND     | 6      | Ground  |            |
+DB15    | 22     | GPIO 25 |            |
+DB14    | 24     | GPIO 8  |            |
+DB13    | 26     | GPIO 7  |            |
+DB12    | 28     | GPIO 1  |            |
+DB11    | 32     | GPIO 12 |            |
+DB10    | 36     | GPIO 16 |            |
+DB9     | 38     | GPIO 20 |            |
+DB8     | 40     | GPIO 21 |            |
+DB7     | 21     | GPIO 9  |            |
+DB6     | 23     | GPIO 11 |            |
+DB5     | 27     | GPIO 0  |            |
+DB4     | 29     | GPIO 5  |            |
+DB3     | 31     | GPIO 6  |            |
+DB2     | 33     | GPIO 13 |            |
+DB1     | 35     | GPIO 19 |            |
+DB0     | 37     | GPIO 26 |            |
 
